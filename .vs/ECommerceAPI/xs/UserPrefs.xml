@@ -1,0 +1,36 @@
+﻿<Properties StartupConfiguration="{D4EED739-325F-4736-827C-71863F6A40C1}|https">
+  <MonoDevelop.Ide.DebuggingService.PinnedWatches />
+  <MonoDevelop.Ide.ItemProperties.ECommerceAPI PreferredExecutionTarget="/Applications/Firefox.app" />
+  <MonoDevelop.Ide.DebuggingService.Breakpoints>
+    <BreakpointStore />
+  </MonoDevelop.Ide.DebuggingService.Breakpoints>
+  <MonoDevelop.Ide.Workbench ActiveDocument="ECommerceAPI/Controllers/ProductController.cs">
+    <Files>
+      <File FileName="ECommerceAPI/Program.cs" Line="82" Column="44" />
+      <File FileName="ECommerceAPI/Data/DataContext.cs" Line="60" Column="33" />
+      <File FileName="ECommerceAPI/Controllers/OrderController.cs" Line="37" Column="28" />
+      <File FileName="ECommerceAPI/Services/OrderService.cs" Line="18" Column="25" />
+      <File FileName="ECommerceAPI/Controllers/ProductController.cs" Line="16" Column="32" />
+      <File FileName="ECommerceAPI/Services/ProductService.cs" Line="81" Column="11" />
+    </Files>
+    <Pads>
+      <Pad Id="ProjectPad">
+        <State name="__root__">
+          <Node name="ECommerceAPI" expanded="True">
+            <Node name="ECommerceAPI" expanded="True">
+              <Node name="Controllers" expanded="True" />
+              <Node name="Data" expanded="True" />
+              <Node name="DTOs" expanded="True" />
+              <Node name="Models" expanded="True" />
+              <Node name="Services" expanded="True">
+                <Node name="OrderService.cs" selected="True" />
+              </Node>
+            </Node>
+          </Node>
+        </State>
+      </Pad>
+    </Pads>
+  </MonoDevelop.Ide.Workbench>
+  <MonoDevelop.Ide.Workspace ActiveConfiguration="Debug" />
+  <MultiItemStartupConfigurations />
+</Properties>
