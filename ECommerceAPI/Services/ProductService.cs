@@ -20,7 +20,7 @@ public class ProductService
         [FromQuery] decimal? maxPrice,
         [FromQuery] int? categoryId,
         [FromQuery] string? sortBy = "name",
-        [FromQuery] bool descendingSortOrder = true,
+        [FromQuery] bool descendingSortOrder = false,
         [FromQuery] int page = 1,
         [FromQuery] int pageSize = 20)
     {
@@ -66,7 +66,9 @@ public class ProductService
                            ? query.OrderByDescending(q => q.UpdatedAt)
                            : query.OrderBy(q => q.UpdatedAt),
 
-            _ => query.OrderBy(q => q.Name)
+            _ => descendingSortOrder
+                 ? query.OrderByDescending(q => q.UpdatedAt)
+                 : query.OrderBy(q => q.UpdatedAt)
         };
 
         // apply pagination
