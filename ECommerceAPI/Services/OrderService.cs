@@ -135,7 +135,7 @@ public class OrderService
                                                                OrderStatus newStatus)
     {
         Order? order = await _dataContext.Orders.Include(o => o.OrderItems)
-                                                .ThenInclude(oi => oi.ProductId)
+                                                .ThenInclude(oi => oi.Product)
                                                 .Include(o => o.OrderStatusHistory)
                                                 .FirstOrDefaultAsync(o => o.Id == orderId)
                                                 ?? throw new OrderNotFoundException(orderId);

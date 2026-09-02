@@ -43,10 +43,11 @@ public class DataContext : DbContext
                                                        "price > 0"));
 
         // use transaction id to detect optimistic concurrency conflicts
-        modelBuilder.Entity<Product>()
-                    .Property<uint>("xmin")
-                    .HasColumnType("xid")
-                    .IsRowVersion();
+        if (Database.IsNpgsql())
+            modelBuilder.Entity<Product>()
+                        .Property<uint>("xmin")
+                        .HasColumnType("xid")
+                        .IsRowVersion();
 
         // CATEGORY
         // seed categories
