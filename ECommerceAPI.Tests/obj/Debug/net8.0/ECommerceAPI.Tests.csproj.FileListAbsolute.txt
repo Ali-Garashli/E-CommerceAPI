@@ -160,3 +160,5 @@
 /Users/betik/Projects/İTMİM/ECommerceAPI/ECommerceAPI.Tests/obj/Debug/net8.0/ECommerceAPI.Tests.genruntimeconfig.cache
 /Users/betik/Projects/İTMİM/ECommerceAPI/ECommerceAPI.Tests/obj/Debug/net8.0/ref/ECommerceAPI.Tests.dll
 /Users/betik/Projects/İTMİM/ECommerceAPI/ECommerceAPI.Tests/bin/Debug/net8.0/ECommerceAPI.staticwebassets.endpoints.json
+/Users/betik/Projects/İTMİM/ECommerceAPI/ECommerceAPI.Tests/bin/Debug/net8.0/Castle.Core.dll
+/Users/betik/Projects/İTMİM/ECommerceAPI/ECommerceAPI.Tests/bin/Debug/net8.0/Moq.dll

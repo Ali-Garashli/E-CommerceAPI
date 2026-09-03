@@ -6,7 +6,7 @@ using System.Text;
 
 namespace ECommerceAPI.Services;
 
-public class TokenService
+public class TokenService : ITokenService
 {
     private readonly IConfiguration _config;
 

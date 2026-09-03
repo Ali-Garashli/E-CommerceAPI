@@ -7,13 +7,13 @@ using Microsoft.EntityFrameworkCore;
 
 namespace ECommerceAPI.Tests;
 
-public class ProoductServiceTests : IDisposable
+public class ProductServiceTests : IDisposable
 {
     private readonly SqliteConnection _sqliteConnection;
     private readonly DataContext _dataContext;
     private readonly ProductService _productService;
 
-    public ProoductServiceTests()
+    public ProductServiceTests()
     {
         _sqliteConnection = new SqliteConnection("Filename=:memory:");
         _sqliteConnection.Open();

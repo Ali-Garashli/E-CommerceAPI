@@ -20,7 +20,6 @@ public class AppUserUpdateDTO
     [Range(0, 150)]
     public int Age { get; set; }
 
-
     [Required]
     [DataType(DataType.Password)]
     [StringLength(100, MinimumLength = 8,

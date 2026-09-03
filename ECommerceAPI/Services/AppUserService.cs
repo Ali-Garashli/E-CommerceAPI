@@ -45,7 +45,7 @@ public class AppUserService
     public async Task<AppUserResponseDTO> CreateUserAsync(AppUserCreateDTO userDTO)
     {
         if (await _dataContext.Users.AnyAsync(u => u.Email == userDTO.Email))
-            throw new UserAlreadyExistsException(userDTO.Email);
+            throw new UserEmailIsTakenException(userDTO.Email);
 
         AppUser newUser = new()
         {
@@ -77,6 +77,10 @@ public class AppUserService
         AppUser? appUser = await _dataContext.Users.FindAsync(id)
                            ?? throw new UserNotFoundException(id);
 
+        if (await _dataContext.Users.AnyAsync(u => u.Email == userDTO.Email
+                                                   && u.Email != appUser.Email))
+            throw new UserEmailIsTakenException(userDTO.Email);
+
         if (!string.IsNullOrEmpty(userDTO.Email))
             appUser.Email = userDTO.Email;
 
@@ -86,7 +90,8 @@ public class AppUserService
         if (!string.IsNullOrEmpty(userDTO.LastName))
             appUser.LastName = userDTO.LastName;
 
-        appUser.Age = userDTO.Age;
+        if (userDTO.Age > 0)
+            appUser.Age = userDTO.Age;
 
         if (!string.IsNullOrEmpty(userDTO.Password))
             appUser.PasswordHash = _passwordHasher.HashPassword(appUser, userDTO.Password);

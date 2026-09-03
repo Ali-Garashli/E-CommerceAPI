@@ -1,9 +1,7 @@
-﻿using System.Security.Authentication;
-using ECommerceAPI.Data;
+﻿using ECommerceAPI.Data;
 using ECommerceAPI.DTOs;
 using ECommerceAPI.Models;
 using Microsoft.AspNetCore.Identity;
-using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 
 namespace ECommerceAPI.Services;
@@ -11,11 +9,11 @@ namespace ECommerceAPI.Services;
 public class AuthService
 {
     private readonly DataContext _dataContext;
-    private readonly TokenService _tokenService;
+    private readonly ITokenService _tokenService;
     private readonly IPasswordHasher<AppUser> _passwordHasher;
 
     public AuthService(DataContext dataContext,
-                       TokenService tokenService,
+                       ITokenService tokenService,
                        IPasswordHasher<AppUser> passwordHasher)
     {
         _dataContext = dataContext;
@@ -27,7 +25,7 @@ public class AuthService
     public async Task RegisterAsync(RegisterDTO registerDTO)
     {
         if (await _dataContext.Users.AnyAsync(u => u.Email == registerDTO.Email))
-            throw new UserAlreadyExistsException(registerDTO.Email);
+            throw new UserEmailIsTakenException(registerDTO.Email);
 
         AppUser newUser = new()
         {
@@ -42,7 +40,6 @@ public class AuthService
 
         _dataContext.Users.Add(newUser);
         await _dataContext.SaveChangesAsync();
-
     }
 
     // LOGIN

@@ -45,10 +45,10 @@ public class UserNotFoundException : Exception
     { }
 }
 
-public class UserAlreadyExistsException : Exception
+public class UserEmailIsTakenException : Exception
 {
-    public UserAlreadyExistsException(string email)
-        : base($"User with the email '{email}' already exists.")
+    public UserEmailIsTakenException(string email)
+        : base($"A user with eamil '{email}' already exists.")
     { }
 }
 

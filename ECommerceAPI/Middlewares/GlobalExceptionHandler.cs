@@ -17,7 +17,7 @@ public class GlobalExceptionHandler : IExceptionHandler
             ProductNotFoundException => (StatusCodes.Status404NotFound, "Product not found"),
             OrderNotFoundException => (StatusCodes.Status404NotFound, "Order not found"),
             UserNotFoundException => (StatusCodes.Status404NotFound, "User not found"),
-            UserAlreadyExistsException => (StatusCodes.Status409Conflict, "User already exists"),
+            UserEmailIsTakenException => (StatusCodes.Status409Conflict, "Email is taken"),
             InvalidCredentialsException => (StatusCodes.Status401Unauthorized, "Invalid credentials"),
             CategoryNotFoundException => (StatusCodes.Status400BadRequest, "Invalid category"),
             InsufficientStockException => (StatusCodes.Status409Conflict, "Insufficient stock"),
