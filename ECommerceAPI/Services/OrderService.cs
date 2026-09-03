@@ -50,78 +50,77 @@ public class OrderService
     public async Task<OrderResponseDTO> CreateOrderAsync(int userId,
                                                          OrderCreateDTO orderDTO)
     {
+        // we execute the transaction inside a strategy, otherwise EF can't retry in case of failure
+        var strategy = _dataContext.Database.CreateExecutionStrategy();
+
         for (int attempt = 1; attempt <= 5; attempt++)
         {
-            await using var transaction = await _dataContext.Database.BeginTransactionAsync();
-
             try
             {
-                Order order = new()
-                {
-                    UserId = userId,
-                    Status = OrderStatus.Pending
-                };
+                return await strategy.ExecuteAsync(async () => {
+                    // if anything throws, transaction will roll back automatically
+                    await using var transaction = await _dataContext.Database.BeginTransactionAsync();
 
-                decimal total = 0m;
-
-                var groupedItems = orderDTO.OrderItemDTOs.GroupBy(i => i.ProductId)
-                                                         .Select(g => new {
-                                                             ProductId = g.Key,
-                                                             Quantity = g.Sum(i => i.Quantity)
-                                                         });
-
-                foreach (var line in groupedItems)
-                {
-                    Product? product = await _dataContext.Products
-                        .FirstOrDefaultAsync(p => p.Id == line.ProductId && p.IsActive)
-                        ?? throw new ProductNotFoundException(line.ProductId);
-
-                    if (product.Stock < line.Quantity)
-                        throw new InsufficientStockException(product.Name,
-                                                             product.Stock,
-                                                             line.Quantity);
-
-                    product.Stock -= line.Quantity;
-
-                    OrderItem? orderItem = new()
+                    Order order = new()
                     {
-                        ProductId = product.Id,
-                        Product = product,
-                        Quantity = line.Quantity,
-                        ProductPrice = product.Price // price when purchase happened
+                        UserId = userId,
+                        Status = OrderStatus.Pending
                     };
 
-                    order.OrderItems.Add(orderItem);
-                    total += orderItem.TotalPrice;
-                }
+                    decimal total = 0m;
 
-                order.TotalAmount = total;
+                    var groupedItems = orderDTO.OrderItemDTOs.GroupBy(i => i.ProductId)
+                                                             .Select(g => new {
+                                                                 ProductId = g.Key,
+                                                                 Quantity = g.Sum(i => i.Quantity)
+                                                             });
 
-                order.OrderStatusHistory.Add(new OrderStatusHistory
-                                             {
-                                                 Order = order,
-                                                 StatusFrom = null,
-                                                 StatusTo = OrderStatus.Pending
-                                             });
+                    foreach (var line in groupedItems)
+                    {
+                        Product? product = await _dataContext.Products
+                            .FirstOrDefaultAsync(p => p.Id == line.ProductId && p.IsActive)
+                            ?? throw new ProductNotFoundException(line.ProductId);
 
-                _dataContext.Orders.Add(order);
+                        if (product.Stock < line.Quantity)
+                            throw new InsufficientStockException(product.Name,
+                                                                 product.Stock,
+                                                                 line.Quantity);
 
-                await _dataContext.SaveChangesAsync();
-                await transaction.CommitAsync();
+                        product.Stock -= line.Quantity;
 
-                return OrderResponseDTO.ConvertToDTO(order);
+                        OrderItem? orderItem = new()
+                        {
+                            ProductId = product.Id,
+                            Product = product,
+                            Quantity = line.Quantity,
+                            ProductPrice = product.Price // price when purchase happened
+                        };
+
+                        order.OrderItems.Add(orderItem);
+                        total += orderItem.TotalPrice;
+                    }
+
+                    order.TotalAmount = total;
+
+                    order.OrderStatusHistory.Add(new OrderStatusHistory
+                                                 {
+                                                     Order = order,
+                                                     StatusFrom = null,
+                                                     StatusTo = OrderStatus.Pending
+                                                 });
+
+                    _dataContext.Orders.Add(order);
+
+                    await _dataContext.SaveChangesAsync();
+                    await transaction.CommitAsync();
+
+                    return OrderResponseDTO.ConvertToDTO(order);
+                });
             }
             // if another request changed stock in the meantime
             catch (DbUpdateConcurrencyException) when (attempt < 5)
             {
-                // roll back and retry
-                await transaction.RollbackAsync();
                 _dataContext.ChangeTracker.Clear();
-            }
-            catch
-            {
-                await transaction.RollbackAsync();
-                throw;
             }
         }
 

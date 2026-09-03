@@ -28,28 +28,60 @@ public class RateLimitService
         DateTime windowStart = GetWindowStart(now, policy.WindowSeconds);
         DateTime windowEnd = windowStart.AddSeconds(policy.WindowSeconds);
 
-        // start a transaction to make changes atomic
-        await using var transaction =
-            await _dataContext.Database.BeginTransactionAsync(
-                IsolationLevel.Serializable);
+        // we execute the transaction inside a strategy, otherwise EF can't retry in case of failure
+        var strategy = _dataContext.Database.CreateExecutionStrategy();
 
-        RateLimitCounter? counter = await _dataContext.RateLimitCounters
-            .FirstOrDefaultAsync(c => c.PolicyName.Equals(policyName)
-                                      && c.Client.Equals(client)
-                                      && c.WindowStart == windowStart);
+        return await strategy.ExecuteAsync(async () => {
+            // start a transaction to make changes atomic
+            await using var transaction =
+                await _dataContext.Database.BeginTransactionAsync(IsolationLevel.Serializable);
 
-        // if there is no counter, create one
-        if (counter is null)
-        {
-            counter = new RateLimitCounter
+            RateLimitCounter? counter = await _dataContext.RateLimitCounters
+                .FirstOrDefaultAsync(c => c.PolicyName.Equals(policyName)
+                                          && c.Client.Equals(client)
+                                          && c.WindowStart == windowStart);
+
+            // if there is no counter, create one
+            if (counter is null)
             {
-                PolicyName = policyName,
-                Client = client,
-                WindowStart = windowStart,
-                RequestCount = 1
-            };
+                counter = new RateLimitCounter
+                {
+                    PolicyName = policyName,
+                    Client = client,
+                    WindowStart = windowStart,
+                    RequestCount = 1
+                };
 
-            _dataContext.RateLimitCounters.Add(counter);
+                _dataContext.RateLimitCounters.Add(counter);
+
+                await _dataContext.SaveChangesAsync();
+                await transaction.CommitAsync();
+
+                return new RateLimitResultDTO
+                {
+                    Allowed = true,
+                    Limit = policy.PermitLimit,
+                    Remaining = policy.PermitLimit - 1,
+                    WindowEnd = windowEnd
+                };
+            }
+
+            // if count limit is exceeded, return don't allow
+            if (counter.RequestCount >= policy.PermitLimit)
+            {
+                await transaction.CommitAsync();
+
+                return new RateLimitResultDTO
+                {
+                    Allowed = false,
+                    Limit = policy.PermitLimit,
+                    Remaining = 0,
+                    WindowEnd = windowEnd
+                };
+            }
+
+            // otherwise, just increase the counter
+            counter.RequestCount++;
 
             await _dataContext.SaveChangesAsync();
             await transaction.CommitAsync();
@@ -58,38 +90,10 @@ public class RateLimitService
             {
                 Allowed = true,
                 Limit = policy.PermitLimit,
-                Remaining = policy.PermitLimit - 1,
+                Remaining = policy.PermitLimit - counter.RequestCount,
                 WindowEnd = windowEnd
             };
-        }
-
-        // if count limit is exceeded, return don't allow
-        if (counter.RequestCount >= policy.PermitLimit)
-        {
-            await transaction.CommitAsync();
-
-            return new RateLimitResultDTO
-            {
-                Allowed = false,
-                Limit = policy.PermitLimit,
-                Remaining = 0,
-                WindowEnd = windowEnd
-            };
-        }
-
-        // otherwise, just increase the counter
-        counter.RequestCount++;
-
-        await _dataContext.SaveChangesAsync();
-        await transaction.CommitAsync();
-
-        return new RateLimitResultDTO
-        {
-            Allowed = true,
-            Limit = policy.PermitLimit,
-            Remaining = policy.PermitLimit - counter.RequestCount,
-            WindowEnd = windowEnd
-        };
+        });
     }
 
     private static DateTime GetWindowStart(DateTime now,

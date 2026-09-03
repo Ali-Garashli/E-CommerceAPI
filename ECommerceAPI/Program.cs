@@ -41,7 +41,11 @@ builder.Services.AddAuthentication(options => {
 builder.Services.AddControllers();
 
 builder.Services.AddDbContext<DataContext>(options =>
-    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"))
+    options.UseNpgsql(builder.Configuration.GetConnectionString("DefaultConnection"),
+                      npgsqlOptions => npgsqlOptions.EnableRetryOnFailure(
+                                       maxRetryCount: 5,
+                                       maxRetryDelay: TimeSpan.FromSeconds(10),
+                                       errorCodesToAdd: null))
            .UseSnakeCaseNamingConvention());
 
 // Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
@@ -91,6 +95,13 @@ builder.Services.AddScoped<OrderService>();
 
 
 var app = builder.Build();
+
+// apply migrations automatically:
+using (var scope = app.Services.CreateScope())
+{
+    DataContext context = scope.ServiceProvider.GetRequiredService<DataContext>();
+    context.Database.Migrate();
+}
 
 app.UseMiddleware<HttpLoggingMiddleware>();
 app.UseExceptionHandler();

@@ -1,0 +1,18 @@
+# Local build output — these are platform-specific and would conflict with
+# what gets built fresh inside the Linux container.
+**/bin/
+**/obj/
+
+# Editor/IDE clutter — no reason for these to ever enter the build context.
+.vs/
+.vscode/
+*.user
+
+# Don't ship your git history into the image.
+.git/
+.gitignore
+
+# Local secrets — never bake these into an image; use environment
+# variables or Docker secrets instead.
+**/appsettings.Development.json
+**/appsettings.Local.json

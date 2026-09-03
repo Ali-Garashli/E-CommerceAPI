@@ -1,7 +1,6 @@
 ﻿using ECommerceAPI.Attributes;
 using ECommerceAPI.Data;
 using ECommerceAPI.Models;
-using Microsoft.Extensions.Logging;
 using System.Diagnostics;
 using System.Text;
 
