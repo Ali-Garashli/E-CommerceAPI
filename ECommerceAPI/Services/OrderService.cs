@@ -1,4 +1,7 @@
-﻿using ECommerceAPI.Data;
+﻿using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using ECommerceAPI.Data;
 using ECommerceAPI.DTOs;
 using ECommerceAPI.Models;
 using Microsoft.EntityFrameworkCore;
@@ -48,7 +51,125 @@ public class OrderService
 
     // POST
     public async Task<OrderResponseDTO> CreateOrderAsync(int userId,
-                                                         OrderCreateDTO orderDTO)
+                                                         OrderCreateDTO request,
+                                                         string? idempotencyKey = null)
+    {
+        // idempotency key is optional
+        if (string.IsNullOrWhiteSpace(idempotencyKey))
+            return await ExecuteOrderCreationStrategyAsync(userId, request);
+
+        string requestHash = ComputeRequestHash(request);
+        IdempotencyKey claim = new()
+        {
+            UserId = userId,
+            Key = idempotencyKey,
+            RequestHash = requestHash,
+            Status = IdempotencyKeyStatus.InProgress
+        };
+
+        _dataContext.IdempotencyKeys.Add(claim);
+
+        try
+        {
+            // save the claim first immediately, so that it is visible to any concurrent duplicate request
+            await _dataContext.SaveChangesAsync();
+        }
+        catch (DbUpdateException)
+        {
+            _dataContext.Entry(claim).State = EntityState.Detached;
+
+            IdempotencyKey? existingKey =
+                await _dataContext.IdempotencyKeys.AsNoTracking()
+                                                  .FirstOrDefaultAsync(k => k.UserId == userId
+                                                                            && k.Key == idempotencyKey);
+
+            if (existingKey is null)
+                throw; // the unique-index violation wasn't actually this key. Rethrow the real error
+
+            if (existingKey.RequestHash != requestHash)
+                throw new IdempotencyKeyMismatchException(idempotencyKey);
+
+            if (existingKey.Status == IdempotencyKeyStatus.InProgress)
+                throw new IdempotencyKeyInProgressException(idempotencyKey);
+
+            // completed with the same request body. Replay the original result
+            return JsonSerializer.Deserialize<OrderResponseDTO>(existingKey.ResponseBody!)!;
+        }
+
+        try
+        {
+            OrderResponseDTO responseDTO = await ExecuteOrderCreationStrategyAsync(userId, request);
+
+            claim.Status = IdempotencyKeyStatus.Completed;
+            claim.ResponseBody = JsonSerializer.Serialize(responseDTO);
+            claim.CompletedAt = DateTime.UtcNow;
+            await _dataContext.SaveChangesAsync();
+
+            return responseDTO;
+        }
+        catch
+        {
+            // if the order failed for some reason, release the key so that user can retry
+            _dataContext.IdempotencyKeys.Remove(claim);
+            await _dataContext.SaveChangesAsync();
+            throw;
+        }
+    }
+
+
+    public async Task<OrderResponseDTO> UpdateOrderStatusAsync(int orderId,
+                                                               int requesterId,
+                                                               bool isAdmin,
+                                                               OrderStatus newStatus)
+    {
+        Order? order = await _dataContext.Orders.Include(o => o.OrderItems)
+                                                .ThenInclude(oi => oi.Product)
+                                                .Include(o => o.OrderStatusHistory)
+                                                .FirstOrDefaultAsync(o => o.Id == orderId)
+                                                ?? throw new OrderNotFoundException(orderId);
+
+        if (!isAdmin && order.UserId != requesterId)
+            throw new OrderNotFoundException(orderId);
+
+        // only admin can set status other than cancelled
+        if (!isAdmin && newStatus != OrderStatus.Cancelled)
+            throw new UnauthorizedAccessException("Customers can only cancel their orders.");
+
+        // Only these status transitions are allowed:
+        // Pending → Confirmed → Completed
+        // Pending → Cancelled
+        Dictionary<OrderStatus, OrderStatus[]> AllowedTransitions = new()
+        {
+            [OrderStatus.Pending] = new[] { OrderStatus.Confirmed, OrderStatus.Cancelled },
+            [OrderStatus.Confirmed] = new[] { OrderStatus.Completed },
+            [OrderStatus.Completed] = Array.Empty<OrderStatus>(),
+            [OrderStatus.Cancelled] = Array.Empty<OrderStatus>()
+        };
+
+        if (!AllowedTransitions.TryGetValue(order.Status, out var allowed)
+            || !allowed.Contains(newStatus))
+            throw new InvalidOrderStatusTransitionException(order.Status, newStatus);
+
+        OrderStatus previousStatus = order.Status;
+        order.Status = newStatus;
+        order.UpdatedAt = DateTime.UtcNow;
+
+        order.OrderStatusHistory.Add(new OrderStatusHistory
+                                     {
+                                         OrderId = order.Id,
+                                         StatusFrom = previousStatus,
+                                         StatusTo = newStatus
+                                     });
+
+        await _dataContext.SaveChangesAsync();
+
+        return OrderResponseDTO.ConvertToDTO(order);
+    }
+
+
+    // HELPER
+    public async Task<OrderResponseDTO> ExecuteOrderCreationStrategyAsync(int userId,
+                                                                          OrderCreateDTO orderDTO)
     {
         // we execute the transaction inside a strategy, otherwise EF can't retry in case of failure
         var strategy = _dataContext.Database.CreateExecutionStrategy();
@@ -103,11 +224,11 @@ public class OrderService
                     order.TotalAmount = total;
 
                     order.OrderStatusHistory.Add(new OrderStatusHistory
-                                                 {
-                                                     Order = order,
-                                                     StatusFrom = null,
-                                                     StatusTo = OrderStatus.Pending
-                                                 });
+                    {
+                        Order = order,
+                        StatusFrom = null,
+                        StatusTo = OrderStatus.Pending
+                    });
 
                     _dataContext.Orders.Add(order);
 
@@ -128,53 +249,17 @@ public class OrderService
                                             "concurrent stock updates. Please try again.");
     }
 
-    public async Task<OrderResponseDTO> UpdateOrderStatusAsync(int orderId,
-                                                               int requesterId,
-                                                               bool isAdmin,
-                                                               OrderStatus newStatus)
+    private static string ComputeRequestHash(OrderCreateDTO requestDTO)
     {
-        Order? order = await _dataContext.Orders.Include(o => o.OrderItems)
-                                                .ThenInclude(oi => oi.Product)
-                                                .Include(o => o.OrderStatusHistory)
-                                                .FirstOrDefaultAsync(o => o.Id == orderId)
-                                                ?? throw new OrderNotFoundException(orderId);
+        // same order with different sequence of items will return same hash
+        var normalized = requestDTO.OrderItemDTOs.OrderBy(i => i.ProductId)
+                                                 .Select(i => new { i.ProductId, i.Quantity });
 
-        if (!isAdmin && order.UserId != requesterId)
-            throw new OrderNotFoundException(orderId);
+        string json = JsonSerializer.Serialize(normalized);
+        byte[] bytes = SHA256.HashData(Encoding.UTF8.GetBytes(json));
 
-        // only admin can set status other than cancelled
-        if (!isAdmin && newStatus != OrderStatus.Cancelled)
-            throw new UnauthorizedAccessException("Customers can only cancel their orders.");
-
-        // Only these status transitions are allowed:
-        // Pending → Confirmed → Completed
-        // Pending → Cancelled
-        Dictionary<OrderStatus, OrderStatus[]> AllowedTransitions = new()
-        {
-            [OrderStatus.Pending] = new[] { OrderStatus.Confirmed, OrderStatus.Cancelled },
-            [OrderStatus.Confirmed] = new[] { OrderStatus.Completed },
-            [OrderStatus.Completed] = Array.Empty<OrderStatus>(),
-            [OrderStatus.Cancelled] = Array.Empty<OrderStatus>()
-        };
-
-        if (!AllowedTransitions.TryGetValue(order.Status, out var allowed)
-            || !allowed.Contains(newStatus))
-            throw new InvalidOrderStatusTransitionException(order.Status, newStatus);
-
-        OrderStatus previousStatus = order.Status;
-        order.Status = newStatus;
-        order.UpdatedAt = DateTime.UtcNow;
-
-        order.OrderStatusHistory.Add(new OrderStatusHistory
-                                     {
-                                         OrderId = order.Id,
-                                         StatusFrom = previousStatus,
-                                         StatusTo = newStatus
-                                     });
-
-        await _dataContext.SaveChangesAsync();
-
-        return OrderResponseDTO.ConvertToDTO(order);
+        return Convert.ToHexString(bytes);
     }
+
 }
 

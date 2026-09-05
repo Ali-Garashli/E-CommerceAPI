@@ -115,8 +115,11 @@
 /Users/betik/Projects/İTMİM/ECommerceAPI/ECommerceAPI/bin/Debug/net8.0/FluentValidation.dll
 /Users/betik/Projects/İTMİM/ECommerceAPI/ECommerceAPI/bin/Debug/net8.0/FluentValidation.DependencyInjectionExtensions.dll
 /Users/betik/Projects/İTMİM/ECommerceAPI/ECommerceAPI/obj/Debug/net8.0/ECommerceAPI.sourcelink.json
-/Users/betik/Projects/İTMİM/ECommerceAPI/ECommerceAPI/obj/Debug/net8.0/staticwebassets/msbuild.ECommerceAPI.Microsoft.AspNetCore.StaticWebAssets.props
-/Users/betik/Projects/İTMİM/ECommerceAPI/ECommerceAPI/obj/Debug/net8.0/staticwebassets/msbuild.build.ECommerceAPI.props
-/Users/betik/Projects/İTMİM/ECommerceAPI/ECommerceAPI/obj/Debug/net8.0/staticwebassets/msbuild.buildMultiTargeting.ECommerceAPI.props
-/Users/betik/Projects/İTMİM/ECommerceAPI/ECommerceAPI/obj/Debug/net8.0/staticwebassets/msbuild.buildTransitive.ECommerceAPI.props
-/Users/betik/Projects/İTMİM/ECommerceAPI/ECommerceAPI/obj/Debug/net8.0/staticwebassets.pack.json
+/Users/betik/Projects/İTMİM/ECommerceAPI/ECommerceAPI/bin/Debug/net8.0/ECommerceAPI.staticwebassets.endpoints.json
+/Users/betik/Projects/İTMİM/ECommerceAPI/ECommerceAPI/obj/Debug/net8.0/rpswa.dswa.cache.json
+/Users/betik/Projects/İTMİM/ECommerceAPI/ECommerceAPI/obj/Debug/net8.0/rjimswa.dswa.cache.json
+/Users/betik/Projects/İTMİM/ECommerceAPI/ECommerceAPI/obj/Debug/net8.0/rjsmrazor.dswa.cache.json
+/Users/betik/Projects/İTMİM/ECommerceAPI/ECommerceAPI/obj/Debug/net8.0/rjsmcshtml.dswa.cache.json
+/Users/betik/Projects/İTMİM/ECommerceAPI/ECommerceAPI/obj/Debug/net8.0/staticwebassets.build.json.cache
+/Users/betik/Projects/İTMİM/ECommerceAPI/ECommerceAPI/obj/Debug/net8.0/staticwebassets.build.endpoints.json
+/Users/betik/Projects/İTMİM/ECommerceAPI/ECommerceAPI/obj/Debug/net8.0/swae.build.ex.cache

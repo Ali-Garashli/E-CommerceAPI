@@ -11,21 +11,6 @@ public class GlobalExceptionHandler : IExceptionHandler
     public GlobalExceptionHandler(ILogger<GlobalExceptionHandler> logger)
         => _logger = logger;
 
-    private static (int StatusCode, string Title) MapException(Exception exception)
-        => exception switch
-        {
-            ProductNotFoundException => (StatusCodes.Status404NotFound, "Product not found"),
-            OrderNotFoundException => (StatusCodes.Status404NotFound, "Order not found"),
-            UserNotFoundException => (StatusCodes.Status404NotFound, "User not found"),
-            UserEmailIsTakenException => (StatusCodes.Status409Conflict, "Email is taken"),
-            InvalidCredentialsException => (StatusCodes.Status401Unauthorized, "Invalid credentials"),
-            CategoryNotFoundException => (StatusCodes.Status400BadRequest, "Invalid category"),
-            InsufficientStockException => (StatusCodes.Status409Conflict, "Insufficient stock"),
-            InvalidOrderStatusTransitionException => (StatusCodes.Status409Conflict, "Invalid status transition"),
-            UnauthorizedAccessException => (StatusCodes.Status403Forbidden, "Forbidden"),
-            _ => (StatusCodes.Status500InternalServerError, "Internal server error")
-        };
-
     public async ValueTask<bool> TryHandleAsync(HttpContext httpContext,
                                                 Exception exception,
                                                 CancellationToken cancellationToken)
@@ -53,5 +38,22 @@ public class GlobalExceptionHandler : IExceptionHandler
 
         return true;
     }
+
+    private static (int StatusCode, string Title) MapException(Exception exception)
+        => exception switch
+        {
+            ProductNotFoundException => (StatusCodes.Status404NotFound, "Product not found"),
+            OrderNotFoundException => (StatusCodes.Status404NotFound, "Order not found"),
+            UserNotFoundException => (StatusCodes.Status404NotFound, "User not found"),
+            UserEmailIsTakenException => (StatusCodes.Status409Conflict, "Email is taken"),
+            InvalidCredentialsException => (StatusCodes.Status401Unauthorized, "Invalid credentials"),
+            CategoryNotFoundException => (StatusCodes.Status400BadRequest, "Invalid category"),
+            InsufficientStockException => (StatusCodes.Status409Conflict, "Insufficient stock"),
+            InvalidOrderStatusTransitionException => (StatusCodes.Status409Conflict, "Invalid status transition"),
+            UnauthorizedAccessException => (StatusCodes.Status403Forbidden, "Forbidden"),
+            IdempotencyKeyInProgressException => (StatusCodes.Status409Conflict, "Request already in progress"),
+            IdempotencyKeyMismatchException => (StatusCodes.Status409Conflict, "Idempotency key reused"),
+            _ => (StatusCodes.Status500InternalServerError, "Internal server error")
+        };
 }
 

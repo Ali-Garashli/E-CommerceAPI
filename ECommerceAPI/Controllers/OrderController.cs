@@ -47,11 +47,12 @@ public class OrderController : ControllerBase
     [HttpPost]
     [RateLimitPolicy("OrderWritePolicy")]
     public async Task<ActionResult<OrderResponseDTO>> AddOrder(
-        OrderCreateDTO orderCreateDTO)
+        [FromBody] OrderCreateDTO orderCreateDTO,
+        [FromHeader(Name = "Idempotency-Key")] string? idempotencyKey)
     {
-        OrderResponseDTO order = await _orderService
-            .CreateOrderAsync(CurrentUserId,
-                                orderCreateDTO);
+        OrderResponseDTO order = await _orderService.CreateOrderAsync(CurrentUserId,
+                                                                      orderCreateDTO,
+                                                                      idempotencyKey);
 
         return CreatedAtAction(nameof(GetOrder),
                                new { id = order.Id },

@@ -24,8 +24,8 @@ services:
       ASPNETCORE_ENVIRONMENT: Development
       ConnectionStrings__DefaultConnection: "Host=db;Port=5432;Database=ITMIM;Username=postgres;Password=P@ssw0rd"
       Jwt__Key: "28815892e9b7d3f6b9971026b04af6f2fe647fd2b3fd975fda8661944f0d6487"
-      Jwt__Issuer: "https://localhost:8080"
-      Jwt__Audience: "https://localhost:8080"
+      Jwt__Issuer: "ECommerceAPI"
+      Jwt__Audience: "ECommerceAPI"
     depends_on:
       db:
         condition: service_healthy # makes sure postgres has actually accepted connections

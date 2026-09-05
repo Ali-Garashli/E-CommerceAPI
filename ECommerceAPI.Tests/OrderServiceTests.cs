@@ -1,9 +1,13 @@
-﻿using ECommerceAPI.Data;
+﻿using System.Security.Cryptography;
+using System.Text;
+using System.Text.Json;
+using ECommerceAPI.Data;
 using ECommerceAPI.DTOs;
 using ECommerceAPI.Models;
 using ECommerceAPI.Services;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.VisualStudio.TestPlatform.Common;
 
 namespace ECommerceAPI.Tests;
 
@@ -285,6 +289,205 @@ public class OrderServiceTests : IDisposable
     }
 
 
+    // IDEMPOTENCY
+    [Fact]
+    public async Task CreateOrderAsync_SameKeyWithSameRequestTwice_ShouldReturnSameOrderWithoutDuplicating()
+    {
+        // Arrange
+        Product? product = await SeedProductAsync(stock: 10);
+        AppUser user = await SeedUserAsync();
+
+        OrderCreateDTO requestDTO = new()
+        {
+            OrderItemDTOs = new List<OrderItemCreateDTO>
+            {
+                new()
+                {
+                    ProductId = product.Id,
+                    Quantity = 2
+                }
+            }
+        };
+
+        // Act
+        // same key, same request body, called twice
+        OrderResponseDTO firstResponse = await _orderService.CreateOrderAsync(user.Id,
+                                                                              requestDTO,
+                                                                              idempotencyKey: "retry-key-1");
+        OrderResponseDTO secondResponse = await _orderService.CreateOrderAsync(user.Id,
+                                                                               requestDTO,
+                                                                               idempotencyKey: "retry-key-1");
+
+        // Assert
+        Assert.Equal(firstResponse.Id, secondResponse.Id);
+        Assert.Equal(1, await _dataContext.Orders.CountAsync());
+
+        Product? updatedProduct = await _dataContext.Products.FindAsync(product.Id);
+        Assert.Equal(8, updatedProduct!.Stock); // decremented only once, not twice
+    }
+
+    [Fact]
+    public async Task CreateOrderAsync_SameKeyDifferentItems_ShouldThrowMismatchException()
+    {
+        // Arrange
+        Product productA = await SeedProductAsync(stock: 10, price: 10.00m);
+        Product productB = await SeedProductAsync(stock: 10, price: 20.00m);
+        AppUser user = await SeedUserAsync();
+
+        OrderCreateDTO firstRequest = new()
+        {
+            OrderItemDTOs = new List<OrderItemCreateDTO>
+            {
+                new()
+                {
+                    ProductId = productA.Id,
+                    Quantity = 1
+                }
+            }
+        };
+        OrderCreateDTO differentRequest = new()
+        {
+            OrderItemDTOs = new List<OrderItemCreateDTO>
+            {
+                new()
+                {
+                    ProductId = productB.Id,
+                    Quantity = 1
+                }
+            }
+        };
+
+        // Act
+        await _orderService.CreateOrderAsync(user.Id,
+                                             firstRequest,
+                                             idempotencyKey: "reused-key");
+
+        // Assert
+        // reusing the same key for a different order throws
+        await Assert.ThrowsAsync<IdempotencyKeyMismatchException>(() =>
+            _orderService.CreateOrderAsync(user.Id,
+                                           differentRequest,
+                                           idempotencyKey: "reused-key"));
+    }
+
+    [Fact]
+    public async Task CreateOrderAsync_WhenKeyAlreadyInProgress_ShouldThrowInProgressException()
+    {
+        // Arrange
+        Product product = await SeedProductAsync(stock: 10);
+        AppUser user = await SeedUserAsync();
+
+        OrderCreateDTO requestDTO = new()
+        {
+            OrderItemDTOs = new List<OrderItemCreateDTO>
+            {
+                new()
+                {
+                    ProductId = product.Id,
+                    Quantity = 1
+                }
+            }
+        };
+
+        string requestHash = ComputeRequestHash(requestDTO);
+
+        // manually make a concurrent request with a key in progress
+        _dataContext.IdempotencyKeys.Add(new IdempotencyKey
+                                         {
+                                             UserId = user.Id,
+                                             Key = "test-key-123",
+                                             RequestHash = requestHash,
+                                             Status = IdempotencyKeyStatus.InProgress
+                                         });
+        await _dataContext.SaveChangesAsync();
+
+        // Act & Assert
+        await Assert.ThrowsAsync<IdempotencyKeyInProgressException>(() =>
+            _orderService.CreateOrderAsync(user.Id,
+                                           requestDTO,
+                                           idempotencyKey: "test-key-123"));
+    }
+
+    [Fact]
+    public async Task CreateOrderAsync_WhenNoKeyProvided_ShouldNotDeduplicateAtAll()
+    {
+        // Arrange
+        Product product = await SeedProductAsync(stock: 10);
+        AppUser user = await SeedUserAsync();
+
+        OrderCreateDTO requestDTO = new()
+        {
+            OrderItemDTOs = new List<OrderItemCreateDTO>
+            {
+                new()
+                {
+                    ProductId = product.Id,
+                    Quantity = 1
+                }
+            }
+        };
+
+        // Act
+        OrderResponseDTO firstResponse = await _orderService.CreateOrderAsync(user.Id,
+                                                                              requestDTO);
+        OrderResponseDTO secondResponse = await _orderService.CreateOrderAsync(user.Id, 
+                                                                               requestDTO);
+
+        // Assert
+        // the orders should be considered separate
+        Assert.NotEqual(firstResponse.Id, secondResponse.Id);
+        Assert.Equal(2, await _dataContext.Orders.CountAsync());
+    }
+
+    [Fact]
+    public async Task CreateOrderAsync_WhenAttemptWithKeyFailed_ShouldAllowRetryWithSameKey()
+    {
+        // Arrange
+        Product product = await SeedProductAsync(stock: 1); // only 1 in stock
+        AppUser user = await SeedUserAsync();
+
+        OrderCreateDTO requestDTO = new()
+        {
+            OrderItemDTOs = new List<OrderItemCreateDTO>
+            {
+                new()
+                {
+                    ProductId = product.Id,
+                    Quantity = 5 // ordered more than available in stock
+                }
+            }
+        };
+
+        // creating order fails because of insufficient stock, the key must still be usable
+        await Assert.ThrowsAsync<InsufficientStockException>(() =>
+            _orderService.CreateOrderAsync(user.Id,
+                                           requestDTO,
+                                           idempotencyKey: "fix-and-retry"));
+
+        OrderCreateDTO fixedRequestDTO = new()
+        {
+            OrderItemDTOs = new List<OrderItemCreateDTO>
+            {
+                new()
+                {
+                    ProductId = product.Id,
+                    Quantity = 1 // ordered within stock amount
+                }
+            }
+        };
+
+        // Act
+        // this time request should succeed, the key shouldn't be seen as duplicate
+        OrderResponseDTO responseDTO = await _orderService.CreateOrderAsync(user.Id,
+                                                                            fixedRequestDTO,
+                                                                            idempotencyKey: "fix-and-retry");
+
+        // Assert
+        Assert.Equal(1, responseDTO.TotalAmount / responseDTO.Items[0].UnitPrice); // ordered quantity = 1
+        Assert.Equal(1, await _dataContext.Orders.CountAsync());
+    }
+
+
     // HELPER
     private async Task<Product> SeedProductAsync(int stock = 10,
                                                  decimal price = 25.00m,
@@ -343,5 +546,18 @@ public class OrderServiceTests : IDisposable
 
         return await _orderService.CreateOrderAsync(userId, orderRequest);
     }
+
+    // same hash method as OrderService's
+    private static string ComputeRequestHash(OrderCreateDTO requestDTO)
+    {
+        var normalized = requestDTO.OrderItemDTOs.OrderBy(i => i.ProductId)
+                                                 .Select(i => new { i.ProductId, i.Quantity });
+
+        string json = JsonSerializer.Serialize(normalized);
+        byte[] bytes = SHA256.HashData(Encoding.UTF8.GetBytes(json));
+
+        return Convert.ToHexString(bytes);
+    }
+
 }
 

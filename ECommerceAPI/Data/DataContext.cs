@@ -19,6 +19,8 @@ public class DataContext : DbContext
     public DbSet<OrderItem> OrderItems { get; set; }
     public DbSet<OrderStatusHistory> OrderStatusHistories { get; set; }
 
+    public DbSet<IdempotencyKey> IdempotencyKeys { get; set; }
+
     public DataContext(DbContextOptions<DataContext> options)
         : base(options)
     {
@@ -157,5 +159,9 @@ public class DataContext : DbContext
                         }
                     );
 
+        // IDEMPOTENCY KEY
+        modelBuilder.Entity<IdempotencyKey>()
+                    .HasIndex(k => new { k.UserId, k.Key })
+                    .IsUnique();
     }
 }

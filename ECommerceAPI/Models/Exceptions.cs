@@ -58,3 +58,17 @@ public class InvalidCredentialsException : Exception
         : base("Incorrect email or password.")
     { }
 }
+
+public class IdempotencyKeyInProgressException : Exception
+{
+    public IdempotencyKeyInProgressException(string key)
+        : base($"A request with idempotency key '{key}' is already being processed. Please wait and retry.") { }
+}
+
+public class IdempotencyKeyMismatchException : Exception
+{
+    public IdempotencyKeyMismatchException(string key)
+        : base($"Idempotency key '{key}' was already used with a different request body. " +
+               "Use a new key for a genuinely different order.")
+    { }
+}

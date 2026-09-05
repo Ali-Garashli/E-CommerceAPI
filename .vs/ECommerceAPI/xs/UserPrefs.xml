@@ -1,23 +1,20 @@
-﻿<Properties StartupConfiguration="{243E1103-00BF-4332-AE19-20018F698BC4}|Default">
+﻿<Properties StartupConfiguration="{D4EED739-325F-4736-827C-71863F6A40C1}|https">
   <MonoDevelop.Ide.Workspace ActiveConfiguration="Debug" />
-  <MonoDevelop.Ide.Workbench ActiveDocument="ECommerceAPI/Services/OrderService.cs">
+  <MonoDevelop.Ide.Workbench ActiveDocument="ECommerceAPI/appsettings.json">
     <Files>
-      <File FileName="ECommerceAPI/Program.cs" />
-      <File FileName="ECommerceAPI/Data/DataContext.cs" />
-      <File FileName="ECommerceAPI/Controllers/ProductController.cs" />
-      <File FileName="ECommerceAPI/Controllers/AppUserController.cs" />
-      <File FileName="ECommerceAPI/Services/OrderService.cs" Line="30" Column="5" />
+      <File FileName="ECommerceAPI/Program.cs" Line="103" Column="1" />
+      <File FileName="ECommerceAPI/Data/DataContext.cs" Line="142" Column="4" />
+      <File FileName="ECommerceAPI/appsettings.json" Line="19" Column="1" />
+      <File FileName="ECommerceAPI/docker-compose.yml" Line="28" Column="36" />
     </Files>
     <Pads>
       <Pad Id="ProjectPad">
         <State name="__root__">
           <Node name="ECommerceAPI" expanded="True">
-            <Node name="ECommerceAPI" expanded="True">
-              <Node name="Controllers" expanded="True" />
-              <Node name="Data" expanded="True" />
+            <Node name="ECommerceAPI">
               <Node name="Services" expanded="True" />
+              <Node name="appsettings.json" selected="True" />
             </Node>
-            <Node name="ECommerceAPI.Tests" expanded="True" />
           </Node>
         </State>
       </Pad>
